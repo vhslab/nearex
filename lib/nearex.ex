@@ -1,229 +1,68 @@
 defmodule Nearex do
   @moduledoc false
 
-  alias Nearex.Buffer
+  alias Nearex.{HTTP, Serializer, Utils}
+  alias Nearex.Types.{Transaction, Signature}
 
-  @config %{
-    node_url: "https://rpc.testnet.near.org",
-    provider: %{type: "JsonRPCProvider", args: %{url: "https://rpc.testnet.near.org"}},
-    priv_key:
-      "7Y6NcQPXaAFxnVG3aBZTketSxAtX4NvmqgEvPYtQ3HGRhFL5efNAy2T5cYAfpquBwQ2wFBcAvfackXSawKsHbxG",
-    account_id: "aguxez.testnet",
-    network_id: "default"
-  }
+  @spec sign_transaction(map(), Keyword.t()) :: String.t()
+  def sign_transaction(params, extra) do
+    # We're only calling this fetch! function here so we can make sure the key exists. If we wait until it goes through
+    # to the HTTP module it will stay pending until it times out
+    Keyword.fetch!(extra, :near_url)
 
-  @default_gas 100_000_000_000_000
+    private_key = Keyword.fetch!(extra, :private_key)
+    account_id = Keyword.fetch!(extra, :account_id)
+    block_hash = Utils.get_last_block_hash(extra)
 
-  @def_args ~s({"receiver_id":"picks.aguxez.testnet","amount":"1"})
+    # Even if we're sending them as options, some keys are required, say account_id, gas, amount, etc...
+    keypair = Utils.get_keypair(private_key)
+    account_nonce = Utils.get_account_nonce(keypair.public, account_id, extra)
 
-  def send_transaction do
-    public_key = get_keypair().public
+    keypair.public
+    |> Transaction.build_transaction_payload(account_nonce, block_hash, params, extra)
+    |> Transaction.sign_args()
 
-    public_key
-    |> payload(get_account_nonce(public_key), "2HcbhiWaRgm7Zt7GKzEpSeNjVNDjoSysjnA8wHBGEKFT")
-    |> Map.get(:transaction)
-    |> Enum.into([])
-    |> sign_args()
-
-    message = Buffer.split_buff_save()
-
-    Buffer.clean_state()
+    message = Serializer.split_buff_save()
+    Serializer.clean_state()
 
     :sha256
     |> :crypto.hash(message)
-    |> :enacl.sign_detached(get_keypair().secret)
-    |> signed_tx()
-    |> sign_args()
+    |> :enacl.sign_detached(keypair.secret)
+    |> Signature.create_signature(keypair.public, account_nonce, block_hash, params, extra)
+    |> Transaction.sign_args()
 
-    message = Buffer.split_buff_save()
-
-    Buffer.clean_state()
+    message = Serializer.split_buff_save()
+    Serializer.clean_state()
 
     message
     |> :binary.list_to_bin()
     |> Base.encode64()
-    |> do_send()
   end
 
-  defp get_account_nonce(public_key) do
-    %{body: body} =
-      view_function("access_key/#{@config.account_id}/ed25519:#{Base58.encode(public_key)}", "")
+  def send_transaction(params, extra) do
+    Keyword.fetch!(extra, :near_url)
 
-    body["result"]["nonce"] + 1
+    [params]
+    |> HTTP.send_transaction(extra)
+    |> Transaction.parse_if_error()
   end
 
-  # defp get_last_block_hash do
-  #   get_chain_status().body["result"]["sync_info"]["latest_block_hash"]
-  # end
+  def view(contract, method, arguments, extra \\ []) do
+    # Same comment as above
+    Keyword.fetch!(extra, :near_url)
 
-  defp serialize_args(args) do
-    :binary.bin_to_list(args)
-  end
+    # This function returns a charlist & we need to base58 encode it
+    parsed_args =
+      arguments
+      |> Utils.serialize_args()
+      |> to_string()
+      |> Base58.encode()
 
-  defp payload(public_key, account_nonce, block_hash) do
-    %{
-      transaction: [
-        signer_id: %{type: "string", value: "aguxez.testnet"},
-        public_key: [
-          key_type: %{type: "u8", value: 0},
-          data: %{type: [32], value: public_key}
-        ],
-        nonce: %{type: "u64", value: account_nonce},
-        receiver_id: %{type: "string", value: "token.aguxez.testnet"},
-        block_hash: %{
-          type: [32],
-          value: Base58.decode(block_hash)
-        },
-        actions: [
-          function_call: [
-            method_name: %{type: "string", value: "transfer"},
-            args: %{type: ["u8"], value: serialize_args(@def_args)},
-            gas: %{type: "u64", value: @default_gas},
-            amount: %{type: "u128", value: 0}
-          ]
-        ]
-      ]
-    }
-  end
-
-  defp signed_tx(signature) do
-    public_key = get_keypair().public
-
-    tx_payload =
-      payload(
-        public_key,
-        get_account_nonce(public_key),
-        "2HcbhiWaRgm7Zt7GKzEpSeNjVNDjoSysjnA8wHBGEKFT"
-      )
-
-    %{
-      signed_msg: [
-        transaction: tx_payload,
-        signature: [
-          key_type: %{type: "u8", value: 0},
-          data: %{type: [64], value: signature}
-        ]
-      ]
-    }
-  end
-
-  def sign_args(fields) do
-    Enum.each(fields, &match_args/1)
-  end
-
-  defp match_args(args) do
-    case args do
-      {_name, %{type: type, value: value}} when is_bitstring(type) or type == "string" ->
-        # Get the type of message to send
-        write_type = String.to_existing_atom("write_#{type}")
-
-        apply(Buffer, write_type, [value])
-
-      {name, %{type: type, value: values}} when is_list(type) ->
-        [internal_type] = type
-
-        if is_number(internal_type) do
-          if length(:binary.bin_to_list(values)) != internal_type do
-            raise ArgumentError,
-                  "Mismatch on byte length of number, expected #{internal_type} but got #{
-                    length(:binary.bin_to_list(values))
-                  }"
-          end
-
-          Buffer.write_fixed_array(values)
-        else
-          Buffer.write_array(values)
-
-          Enum.map(values, fn val ->
-            sign_args([{name, %{type: internal_type, value: val}}])
-          end)
-        end
-
-      {:function_call, values} ->
-        Buffer.write_u8(2)
-
-        sign_args(values)
-
-      {name, values} when name in [:signed_msg, :transaction, :signature, :public_key] ->
-        sign_args(values)
-
-      {_, values} when is_map(values) ->
-        sign_args(values)
-
-      {_name, values} when is_list(values) ->
-        Buffer.write_array(values)
-
-        sign_args(values)
-    end
-  end
-
-  def get_keypair do
-    @config.priv_key
-    |> Base58.decode()
-    |> :enacl.sign_seed_keypair()
-  end
-
-  def view_function(method, params \\ nil) do
-    request = %{
-      method: "query",
-      params: [method, params || serialized_params()],
-      id: 1,
-      jsonrpc: "2.0"
-    }
-
-    Tesla.post!(
-      client(),
-      "/",
-      request,
-      headers: [{"content-type", "application/json; charset=utf-8"}]
+    HTTP.view_function(
+      "query",
+      "call/#{contract}/#{method}",
+      parsed_args,
+      extra
     )
-  end
-
-  def do_send(params) do
-    request = %{
-      method: "broadcast_tx_commit",
-      params: [params],
-      id: 3,
-      jsonrpc: "2.0"
-    }
-
-    Tesla.post!(
-      client(),
-      "/",
-      request,
-      headers: [{"content-type", "application/json; charset=utf-8"}]
-    )
-  end
-
-  def get_chain_status do
-    request = %{
-      method: "status",
-      params: [],
-      id: 2,
-      jsonrpc: "2.0"
-    }
-
-    Tesla.post!(
-      client(),
-      "/",
-      request,
-      headers: [{"content-type", "application/json; charset=utf-8"}]
-    )
-  end
-
-  defp serialized_params do
-    %{account_id: "picks.aguxez.testnet"}
-    |> Jason.encode!()
-    |> Base58.encode()
-  end
-
-  defp client do
-    Tesla.client([
-      {
-        Tesla.Middleware.BaseUrl,
-        @config.node_url
-      },
-      {Tesla.Middleware.JSON, engine: Jason}
-    ])
   end
 end

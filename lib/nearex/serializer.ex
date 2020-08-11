@@ -1,4 +1,4 @@
-defmodule Nearex.Buffer do
+defmodule Nearex.Serializer do
   @moduledoc false
 
   use GenServer
@@ -61,7 +61,6 @@ defmodule Nearex.Buffer do
 
   @impl true
   def handle_call(:split_buff_save, _from, state) do
-    IO.inspect(state.length, label: "CURRENT LENGTH")
     new_buff = Enum.take(state.buff, state.length)
 
     {:reply, new_buff, %{state | buff: new_buff}}
@@ -79,9 +78,7 @@ defmodule Nearex.Buffer do
 
   @impl true
   def handle_call({:write_u32, value}, _from, state) do
-    new_state =
-      state
-      |> do_write_u32(value)
+    new_state = do_write_u32(state, value)
 
     {:reply, new_state.buff, new_state}
   end

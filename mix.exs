@@ -27,7 +27,8 @@ defmodule Nearex.MixProject do
       {:jason, "~> 1.2"},
       {:tesla, "~> 1.3"},
       {:hackney, "~> 1.16"},
-      {:caustic, "~> 0.1.24"}
+      {:caustic, "~> 0.1.24"},
+      {:mock, "~> 0.3.5", only: :test}
     ]
   end
 end
