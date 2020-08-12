@@ -60,4 +60,7 @@ View functions are very similar, only thing is that you do not need to send priv
 Nearex.view("picks.aguxez.testnet", "get_stake_amount_for_user", %{race_id: "race_id", horse_id: "123", account_id: "m.zest"}, near_url: "https://rpc.testnet.near.org", req_id: "some id")
 ```
 
-:D
+## Pending
+
+- [ ] Use a normal module with an accumulator instead of a GenServer for serialization. With a GenServer we're tied to a long running process which is prone to race conditions.
+- [ ] Support more methods
