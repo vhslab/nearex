@@ -62,5 +62,5 @@ Nearex.view("picks.aguxez.testnet", "get_stake_amount_for_user", %{race_id: "rac
 
 ## Pending
 
-- [ ] Use a normal module with an accumulator instead of a GenServer for serialization. With a GenServer we're tied to a long running process which is prone to race conditions.
+- [x] Use a normal module with an accumulator instead of a GenServer for serialization. With a GenServer we're tied to a long running process which is prone to race conditions.
 - [ ] Support more methods

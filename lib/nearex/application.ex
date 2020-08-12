@@ -8,7 +8,6 @@ defmodule Nearex.Application do
   def start(_type, _args) do
     children = [
       # Starts a worker by calling: Nearex.Worker.start_link(arg)
-      {Nearex.Serializer, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

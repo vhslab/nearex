@@ -49,38 +49,38 @@ defmodule Nearex.Types.Transaction do
     }
   end
 
-  @spec sign_args(%__MODULE__{} | map()) :: no_return()
-  def sign_args(given_args) do
+  @spec sign_args(%__MODULE__{} | map(), map()) :: no_return()
+  def sign_args(given_args, serializer_state) do
     args =
       case given_args do
         struct when is_struct(struct) -> struct.args
         _ -> given_args
       end
 
-    Enum.each(args, &match_args/1)
+    Enum.reduce(args, serializer_state, &match_args/2)
   end
 
-  defp match_args(args) do
+  defp match_args(args, acc) do
     case args do
       %Actions{args: args} ->
-        sign_args(args)
+        sign_args(args, acc)
 
       %Signature{args: args} ->
-        sign_args(args)
+        sign_args(args, acc)
 
       {:function_call, values} ->
-        Serializer.write_u8(2)
+        new_acc = Serializer.write_u8(2, acc)
 
-        sign_args(values)
+        sign_args(values, new_acc)
 
       {name, values} when name in [:transaction, :signature, :public_key] ->
-        sign_args(values)
+        sign_args(values, acc)
 
       {_name, %{type: type, value: value}} when is_bitstring(type) or type == "string" ->
         # Get the type of message to send
         write_type = String.to_existing_atom("write_#{type}")
 
-        apply(Serializer, write_type, [value])
+        apply(Serializer, write_type, [value, acc])
 
       {name, %{type: type, value: values}} when is_list(type) ->
         [internal_type] = type
@@ -88,19 +88,19 @@ defmodule Nearex.Types.Transaction do
         if is_number(internal_type) do
           continue_if_bytes_match(values, internal_type)
 
-          Serializer.write_fixed_array(values)
+          Serializer.write_fixed_array(values, acc)
         else
-          Serializer.write_array(values)
+          new_acc = Serializer.write_array(values, acc)
 
-          Enum.each(values, fn val ->
-            sign_args([{name, %{type: internal_type, value: val}}])
+          Enum.reduce(values, new_acc, fn val, new_ser_state ->
+            sign_args([{name, %{type: internal_type, value: val}}], new_ser_state)
           end)
         end
 
       {_name, values} when is_list(values) ->
-        Serializer.write_array(values)
+        new_acc = Serializer.write_array(values, acc)
 
-        sign_args(values)
+        sign_args(values, new_acc)
     end
   end
 

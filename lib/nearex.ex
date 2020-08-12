@@ -18,23 +18,23 @@ defmodule Nearex do
     keypair = Utils.get_keypair(private_key)
     account_nonce = Utils.get_account_nonce(keypair.public, account_id, extra)
 
-    keypair.public
-    |> Transaction.build_transaction_payload(account_nonce, block_hash, params, extra)
-    |> Transaction.sign_args()
+    serializer_state =
+      keypair.public
+      |> Transaction.build_transaction_payload(account_nonce, block_hash, params, extra)
+      |> Transaction.sign_args(Serializer.init_buffer())
 
-    message = Serializer.split_buff_save()
-    Serializer.clean_state()
+    # Gets the buffer for the length it has
+    message = Enum.take(serializer_state.buff, serializer_state.length)
 
-    :sha256
-    |> :crypto.hash(message)
-    |> :enacl.sign_detached(keypair.secret)
-    |> Signature.create_signature(keypair.public, account_nonce, block_hash, params, extra)
-    |> Transaction.sign_args()
+    second_ser_state =
+      :sha256
+      |> :crypto.hash(message)
+      |> :enacl.sign_detached(keypair.secret)
+      |> Signature.create_signature(keypair.public, account_nonce, block_hash, params, extra)
+      |> Transaction.sign_args(Serializer.init_buffer())
 
-    message = Serializer.split_buff_save()
-    Serializer.clean_state()
-
-    message
+    second_ser_state.buff
+    |> Enum.take(second_ser_state.length)
     |> :binary.list_to_bin()
     |> Base.encode64()
   end
