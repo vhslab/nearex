@@ -11,7 +11,7 @@ defmodule NearexTest do
   @tx_opts [
     account_id: "aguxez.testnet",
     private_key:
-      "7Y6NcQPXaAFxnVG3aBZTketSxAtX4NvmqgEvPYtQ3HGRhFL5efNAy2T5cYAfpquBwQ2wFBcAvfackXSawKsHbxG",
+      "9A6NcQPXaAFxnVG3aBZTketSxAtX4NvmqgEvPYtH33GRhFL5efNAy2T5cYAfpquBwQ2wFBcAvfackXSawKsHb5S",
     near_url: @near_url,
     receiver_id: "token.aguxez.testnet",
     method_name: "transfer"
@@ -93,7 +93,7 @@ defmodule NearexTest do
   end
 
   defp signed_transaction do
-    "DgAAAGFndXhlei50ZXN0bmV0AHeDbGoOOYL0oTv88fDaa+k7TfUg+RxKYiC67oCcCaUtMAAAAAAAAAAUAAAAdG9rZW4uYWd1eGV6LnRlc3RuZXTkdmr779qh/wBh/ds6bdUZ4ju6fR338ZnAGG6XtOBzBgEAAAACCAAAAHRyYW5zZmVyLwAAAHsiYW1vdW50IjoiMTAwIiwicmVjZWl2ZXJfaWQiOiJhZ3V4ZXoudGVzdG5ldCJ9AEB6EPNaAAAAAAAAAAAAAAAAAAAAAAAAAP9pQreYyjsNo1Slfzpc0HHV2T731zauOMXCuoQR/f7Zr9rcYRMologyeYf/0NUUkTk17hktUVbIllQxUTMfcAY="
+    "DgAAAGFndXhlei50ZXN0bmV0ABkwW4Jt7v+OLZd0h1WLfNi9N2iNZRJ6PsoccZ4ik2Z4MAAAAAAAAAAUAAAAdG9rZW4uYWd1eGV6LnRlc3RuZXTkdmr779qh/wBh/ds6bdUZ4ju6fR338ZnAGG6XtOBzBgEAAAACCAAAAHRyYW5zZmVyLwAAAHsiYW1vdW50IjoiMTAwIiwicmVjZWl2ZXJfaWQiOiJhZ3V4ZXoudGVzdG5ldCJ9AEB6EPNaAAAAAAAAAAAAAAAAAAAAAAAAAEJjS/lPAgFvUbLO7gICIKO61kXDeB5pRtWbF4GwnptKhWbFGu99AQ9vOnuTo2UJz4nxduhJD8dcadsjNI3sGgg="
   end
 
   defp error_return(msg) do
